@@ -36,12 +36,18 @@ install:
   - pip install --user -r $PYTHONPATH/requirements-travis.txt
 
 script:
+  - echo 'Running frameReceiverTest...' && echo -en 'travis_fold:start:fr_test\\r'
   - bin/frameReceiverTest --log_level=all
+  - echo -en 'travis_fold:end:fr_test\\r'
 #  - python bin/run_integration_test.py --frames=1 --interval=1.0 --timeout=30 --fr_config=$FR_TEST_CONFIG --fp_config=$FP_TEST_CONFIG
+  - echo 'Running fileWriterTest...' && echo -en 'travis_fold:start:fw_test\\r'
   - bin/fileWriterTest --log_level=all
+  - echo -en 'travis_fold:end:fw_test\\r'
 
 after_success:
+  - echo 'Generating coverage report...' && echo -en 'travis_fold:start:coverage\\r'
   - bash ../coverage.sh
+  - echo -en 'travis_fold:end:coverage\\r'
 
 notifications:
   slack:
