@@ -6,6 +6,7 @@ as a UDP stream. FrameReceiver constructs data frames in shared memory buffers a
 applications to allow processing and storage.
 
 [![Build Status](https://travis-ci.org/percival-detector/odin-data.svg)](https://travis-ci.org/percival-detector/odin-data)
+[![Codecov](https://codecov.io/gh/percival-detector/odin-data/branch/master/graph/badge.svg)](https://codecov.io/gh/percival-detector/odin-data)
 [![Stories in Ready](https://badge.waffle.io/percival-detector/odin-data.png?label=ready&title=Ready)](https://waffle.io/percival-detector/odin-data)
 [![Stories in In Progress](https://badge.waffle.io/percival-detector/odin-data.png?label=In%20Progress&title=In%20Progress)](https://waffle.io/percival-detector/odin-data)
 
