@@ -218,7 +218,7 @@ void Frame::set_parameter(const std::string& index, size_t parameter)
 
 /** Set the compression type of the raw data.
  *
- * 0: None, 1: LZ4, 2: BSLZ4
+ * 0: None, 1: LZ4, 2: BSLZ4, 3: Blosc
  *
  * \param compression type.
  */
@@ -236,6 +236,16 @@ void Frame::set_compression(int compression)
 void Frame::set_data_type(int data_type)
 {
   data_type_ = data_type;
+}
+
+size_t Frame::get_data_type_size()
+{
+  int dt = this->get_data_type();
+  if (dt == -1) return 0;
+  else if (dt == 0) return 1;
+  else if (dt == 1) return 2;
+  else if (dt == 2) return 4;
+  else return 0;
 }
 
 /** Return a parameter for this Frame.
