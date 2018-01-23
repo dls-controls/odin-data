@@ -299,7 +299,7 @@ bool Acquisition::check_frame_valid(boost::shared_ptr<Frame> frame)
     LOG4CXX_ERROR(logger_, "Invalid frame: Frame has compression " << frame->get_compression() <<
         ", expected " << dataset.compression <<
         " for dataset " << dataset.name <<
-        " (0: None, 1: LZ4, 2: BSLZ4)");
+        " (0: None, 1: LZ4, 2: BSLZ4, 3: Blosc)");
     invalid = true;
   }
   if (frame->get_data_type() >= 0 && frame->get_data_type() != dataset.pixel) {

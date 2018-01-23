@@ -68,6 +68,8 @@ private:
   static const H5Z_filter_t LZ4_FILTER = (H5Z_filter_t)32004;
   /** Filter definition to write datasets with bitshuffle processed data */
   static const H5Z_filter_t BSLZ4_FILTER = (H5Z_filter_t)32008;
+  /** Filter definition to write datasets with Blosc processed data */
+  static const H5Z_filter_t BLOSC_FILTER = (H5Z_filter_t)32001;
 
   HDF5Dataset_t& get_hdf5_dataset(const std::string dset_name);
   void extend_dataset(HDF5File::HDF5Dataset_t& dset, size_t frame_no) const;
