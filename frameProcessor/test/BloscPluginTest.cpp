@@ -32,6 +32,7 @@ public:
     frame->set_dimensions("data", img_dims);
     frame->copy_data(static_cast<void*>(img), 24);
     frame->set_data_type(sizeof(img[0]));
+    frame->set_acquisition_id("scan1");
 
     for (int i = 1; i<6; i++)
     {
@@ -39,6 +40,8 @@ public:
       tmp_frame->set_frame_number(i);
       img[0] = i;
       tmp_frame->copy_data(static_cast<void*>(img), 24);
+      tmp_frame->set_data_type(sizeof(img[0]));
+      tmp_frame->set_acquisition_id("scan2");
       tmp_frame->set_dimensions("data", img_dims);
       frames.push_back(tmp_frame);
     }
@@ -57,6 +60,9 @@ BOOST_AUTO_TEST_CASE( BloscPlugin_process_frame )
   // TODO: simply push a frame through the BloscPlugin to trigger the process_frame call and test the compression
   // Unfortunately process_frame is private and can't be called like this. So how?
   BOOST_REQUIRE_NO_THROW(blosc_plugin.compress_frame(frame));
+  BOOST_REQUIRE_NO_THROW(blosc_plugin.compress_frame(frame));
+  BOOST_REQUIRE_NO_THROW(blosc_plugin.compress_frame(frames[0]));
+
 }
 
 BOOST_AUTO_TEST_SUITE_END(); //BloscPluginUnitTest
