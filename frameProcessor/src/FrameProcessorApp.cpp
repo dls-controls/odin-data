@@ -118,6 +118,8 @@ void parse_arguments(int argc, char** argv, po::variables_map& vm, LoggerPtr& lo
            "Set the hdf5 alignment threshold. Default is 1 (no alignment)")
         ("alignment-value",       po::value<size_t>()->default_value(1),
            "Set the hdf5 alignment value. Default is 1 (no alignment)")
+        ("plugins", po::value<std::vector<std::string> >()->multitoken(),
+           "Frame processor plugins to load")
     ;
 
     // Group the variables for parsing at the command line and/or from the configuration file
@@ -308,6 +310,15 @@ void parse_arguments(int argc, char** argv, po::variables_map& vm, LoggerPtr& lo
       LOG4CXX_DEBUG(logger, "Setting alignment value to " << vm["alignment-value"].as<size_t>());
     }
 
+    if (no_client && vm.count("plugins"))
+    {
+      string message = "Configuring plugins: ";
+      std::vector<string> plugins = vm["plugins"].as<std::vector<string> >();
+      for (std::vector<string>::iterator it = plugins.begin(); it != plugins.end(); ++it) {
+        message += *it + ", ";
+      }
+      LOG4CXX_DEBUG(logger, message);
+    }
   }
   catch (po::unknown_option &e)
   {
