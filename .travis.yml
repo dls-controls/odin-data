@@ -14,15 +14,17 @@ matrix:
         - libboost-system-dev
         - libboost-test-dev
         - libboost-thread-dev
+        - libboost-regex-dev
         - libzmq3-dev
         - libpcap-dev
     env: PYTHONPATH=./lib/python FR_TEST_CONFIG=test_config/fr_test.config FP_TEST_CONFIG=test_config/fp_test.config
-      HDF5_ROOT=$HOME/hdf5-1.10.1 BLOSC_ROOT=$HOME/c-blosc-1.14.2 INSTALL_PREFIX=$HOME/install_prefix
+      HDF5_ROOT=$HOME/hdf5-1.10.1 BLOSC_ROOT=$HOME/c-blosc-1.14.2 INSTALL_PREFIX=$HOME/install_prefix EXCALIBUR_PREFIX=$HOME/excalibur-detector-systemtest
       KAFKA_ROOT=$HOME/librdkafka-1.0.0
     before_install:
     - bash .travis-install-hdf5.sh
     - bash .travis-install-blosc.sh
     - bash .travis-install-librdkafka.sh
+    - bash .travis-install-log4cxx.sh
     cache:
       directories:
       - "$HOME/hdf5-1.10.1"
@@ -39,9 +41,17 @@ install:
 - make install
 - HDF5_DIR=$HDF5_ROOT pip install --user h5py
 - pip install --user -r $PYTHONPATH/requirements-travis.txt
+- cd ..
+- bash .travis-install-excalibur.sh
+- cd build
 script:
 - bin/frameReceiverTest --log_level=all
 - bin/frameProcessorTest --log_level=all
+- bin/odinData --ini=${EXCALIBUR_PREFIX}/test_config/excalibur.ini
+- pwd
+- ls -ltr
+- bin/frameTests ${EXCALIBUR_PREFIX}/test_config/test.ini --log_level=all
+
 - ls -R $INSTALL_PREFIX
 notifications:
   slack:
