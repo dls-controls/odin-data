@@ -11,7 +11,7 @@
 #include <boost/filesystem.hpp>
 
 #include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/json_parser.hpp>
 
 #include <log4cxx/logger.h>
 #include <log4cxx/basicconfigurator.h>
@@ -46,11 +46,13 @@ static bool has_suffix(const std::string &str, const std::string &suffix) {
 /** Parse command line arguments
  * /param[in] argc - argument count; number of arguments to parse
  * /param[in] argv - one-dimensional string array of command line arguments
+ * /param[in] vm - boost program_options variables_map
  * /param[in] logger - pointer to logging instance
  * /param[in] ptree - property tree instance
  */
 int parse_arguments(int argc,
-                    char **argv, po::variables_map &vm,
+                    char **argv,
+                    po::variables_map &vm,
                     LoggerPtr &logger,
                     boost::property_tree::ptree &ptree) {
 
@@ -61,7 +63,7 @@ int parse_arguments(int argc,
     po::options_description generic("Generic options");
 
     generic.add_options()
-            ("ini", po::value<std::string>(), "Configuration file")
+            ("json", po::value<std::string>(), "Configuration file")
             ("help", "Print help message");
 
     po::options_description cmdline_options;
@@ -98,10 +100,10 @@ int parse_arguments(int argc,
 
     // Read configuration file; store as boost::property_tree::ptree
 
-    if (vm.count("ini")) {
-      std::string config_file = vm["ini"].as<std::string>();
+    if (vm.count("json")) {
+      std::string config_file = vm["json"].as<std::string>();
       LOG4CXX_DEBUG(logger, "Reading config file " << config_file);
-      boost::property_tree::ini_parser::read_ini(config_file, ptree);
+      boost::property_tree::json_parser::read_json(config_file, ptree);
     } else {
       LOG4CXX_ERROR(logger, "No configuration file specified. Exiting.");
       exit(1);
@@ -147,7 +149,12 @@ int main(int argc, char *argv[]) {
     simulator.run_process(true);
 
     // Allow receiver and processor time to finish frame collection
-    sleep(20);
+    sleep(10);
+
+    pid_t test_pid = -1;
+
+    ControlUtility tests(pt, "", "Main.test", "Test-args", test_pid, logger);
+    tests.run_command();
 
     // If receiver hasn't exited with error; interrupt
     if (receiver_pid != -1) {
