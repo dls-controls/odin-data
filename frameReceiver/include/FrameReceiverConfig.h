@@ -205,6 +205,7 @@ private:
   friend class FrameReceiverRxThread;
   friend class FrameReceiverUDPRxThread;
   friend class FrameReceiverZMQRxThread;
+  friend class FrameReceiverTCPRxThread;
   friend class FrameReceiverConfigTestProxy;
   friend class FrameReceiverRxThreadTestProxy;
 };
