@@ -39,11 +39,11 @@ public:
   virtual ~FrameDecoderTCP() = 0;
 
   virtual void* get_next_message_buffer(void) = 0;
-  virtual const size_t get_image_frame_size(void) const = 0;
-  virtual const size_t get_image_header_size(void) const = 0;
-  virtual const size_t get_image_data_size(void) const = 0;
   
   virtual FrameReceiveState process_message(size_t bytes_received) = 0;
+
+  boost::shared_ptr<void> current_raw_buffer_;                                                                
+  boost::shared_ptr<void> dropped_frame_buffer_;
 
 };
 

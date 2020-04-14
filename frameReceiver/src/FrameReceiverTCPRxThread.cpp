@@ -76,7 +76,7 @@ void FrameReceiverTCPRxThread::run_specific_service(void)
       return;
     }
 
-    if (bind(recv_socket, (struct sockaddr*)&recv_addr, sizeof(recv_addr)) == -1)
+    if (connect(recv_socket, (struct sockaddr*)&recv_addr, sizeof(recv_addr)) == -1)
     {
       std::stringstream ss;
       ss <<  "RX channel failed to bind receive socket for address " << config_.rx_address_ << " port " << rx_port << " : " << strerror(errno);
@@ -102,13 +102,19 @@ void FrameReceiverTCPRxThread::handle_receive_socket(int recv_socket, int recv_p
   // provided memory buffer
   void* frame_buffer = frame_decoder_->get_next_message_buffer();
 
-  size_t message_size = frame_decoder_->get_image_frame_size();
+  size_t message_size = frame_decoder_->get_frame_buffer_size();
 
   socklen_t from_len = sizeof(from_addr);
-  size_t msg_len = recvfrom(recv_socket, frame_buffer, message_size, MSG_PEEK, (struct sockaddr*)&from_addr, &from_len);
 
-  LOG4CXX_DEBUG_LEVEL(3, logger_, "RX thread received " << msg_len << " bytes on recv socket");
+  size_t bytes_received = 0;
 
-  frame_decoder_->process_message(msg_len);
+  while (bytes_received < message_size) {
+    size_t msg_len = recvfrom(recv_socket, frame_buffer, message_size, MSG_DONTWAIT, (struct sockaddr*)&from_addr, &from_len);
+    bytes_received += msg_len;
+    frame_buffer += msg_len;
+    LOG4CXX_DEBUG_LEVEL(3, logger_, "RX thread received " << msg_len << " bytes on recv socket");
+  }
+
+  frame_decoder_->process_message(bytes_received);
 
 }
