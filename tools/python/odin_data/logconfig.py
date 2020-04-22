@@ -108,7 +108,7 @@ def add_graylog_handler(host, port, level="INFO", static_fields=None):
         #  The following custom fields will be disabled if setting this False
         "include_extra_fields": True,
         "username": getpass.getuser(),
-        "pid": os.getpid()
+        "process_id": os.getpid()
     }
     if static_fields is not None:
         graylog_config.update(static_fields)
