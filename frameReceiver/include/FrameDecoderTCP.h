@@ -42,8 +42,7 @@ public:
   
   virtual FrameReceiveState process_message(size_t bytes_received) = 0;
 
-  boost::shared_ptr<void> current_raw_buffer_;                                                                
-  boost::shared_ptr<void> dropped_frame_buffer_;
+  void* current_raw_buffer_;                                                                
 
 };
 
