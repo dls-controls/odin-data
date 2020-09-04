@@ -35,6 +35,8 @@ class FPCompressionAdapter(FrameProcessorAdapter):
     shuffle (SHUFFLE) - Level of shuffle to use (none, bit, byte)
         
     """
+    DATASETS_KEY = 'datasets'
+
     PARAM_HDF_PLUGIN = 'hdf_plugin'
     PARAM_BLOSC_PLUGIN = 'blosc_plugin'
     PARAM_COMPRESSOR = 'compressor'
@@ -76,6 +78,12 @@ class FPCompressionAdapter(FrameProcessorAdapter):
         super(FPCompressionAdapter, self).__init__(**kwargs)
         
         self._compression = 'off'
+        self._datasets = ['data']
+        if self.DATASETS_KEY in kwargs:
+          dataset_list = kwargs[self.DATASETS_KEY].strip()
+          self._datasets = []
+          for ds in dataset_list.split(','):
+            self._datasets.append(ds.strip())
         
         self._threads = self.DEFAULT_THREADS
         self._level = self.DEFAULT_LEVEL
@@ -115,14 +123,15 @@ class FPCompressionAdapter(FrameProcessorAdapter):
         self.put('config/{}/compressor'.format(self._blosc), request)
 
         # Now set the compression parameters on the hdf plugin
-        request = ApiAdapterRequest(json_encode(self.HDF_BLOSC_COMPRESSION))
-        self.put('config/{}/dataset/data/compression'.format(self._hdf), request)
-        request = ApiAdapterRequest(json_encode(self._level))
-        self.put('config/{}/dataset/data/blosc_level'.format(self._hdf), request)
-        request = ApiAdapterRequest(json_encode(self.BLOSC_SHUFFLE[self._shuffle]))
-        self.put('config/{}/dataset/data/blosc_shuffle'.format(self._hdf), request)
-        request = ApiAdapterRequest(json_encode(self.BLOSC_COMPRESSOR[self._compressor]))
-        self.put('config/{}/dataset/data/blosc_compressor'.format(self._hdf), request)
+        for dset in self._datasets:
+          request = ApiAdapterRequest(json_encode(self.HDF_BLOSC_COMPRESSION))
+          self.put('config/{}/dataset/{}/compression'.format(self._hdf, dset), request)
+          request = ApiAdapterRequest(json_encode(self._level))
+          self.put('config/{}/dataset/{}/blosc_level'.format(self._hdf, dset), request)
+          request = ApiAdapterRequest(json_encode(self.BLOSC_SHUFFLE[self._shuffle]))
+          self.put('config/{}/dataset/{}/blosc_shuffle'.format(self._hdf, dset), request)
+          request = ApiAdapterRequest(json_encode(self.BLOSC_COMPRESSOR[self._compressor]))
+          self.put('config/{}/dataset/{}/blosc_compressor'.format(self._hdf, dset), request)
 
       elif value == 'off':
         # First set the FP applications into no_compression mode
@@ -130,8 +139,9 @@ class FPCompressionAdapter(FrameProcessorAdapter):
         self.put('config/execute/index', request)
 
         # Now switch off compression parameters on the hdf plugin
-        request = ApiAdapterRequest(json_encode(self.HDF_NO_COMPRESSION))
-        self.put('config/{}/dataset/data/compression'.format(self._hdf), request)
+        for dset in self._datasets:
+          request = ApiAdapterRequest(json_encode(self.HDF_NO_COMPRESSION))
+          self.put('config/{}/dataset/{}/compression'.format(self._hdf, dset), request)
 
       
       self._compression = value
