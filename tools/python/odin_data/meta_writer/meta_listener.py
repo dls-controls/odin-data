@@ -154,13 +154,14 @@ class MetaListener:
         reply.set_param('acquisitions', status_dict)
 
         # Now delete any finished acquisitions, and stop any stagnant ones
-        for key, value in self._writers.items():
-            if value.finished:
-                del self._writers[key]
-            else:
-                if value.number_processes_running == 0 and value.write_timeout_count > 10 and value.file_created:
-                    self.logger.info('Force stopping stagnant acquisition: ' + str(key))
-                    value.stop()
+        if len(self._writers) > 1:
+            for key, value in self._writers.items():
+                if value.finished:
+                    del self._writers[key]
+                else:
+                    if value.number_processes_running == 0 and value.write_timeout_count > 10 and value.file_created:
+                        self.logger.info('Force stopping stagnant acquisition: ' + str(key))
+                        value.stop()
 
         return reply
 
@@ -181,32 +182,32 @@ class MetaListener:
         reply.set_param('default_directory', self._directory)
         reply.set_param('ctrl_port', self._ctrl_port)
         return reply
-        
+
     def handle_request_version_message(self, msg_id):
         """Handle request version message.
 
         :param: msg_id: message id to use for reply
         """
         reply = IpcMessage(IpcMessage.ACK, 'request_version', id=msg_id)
-        
+
         version=versioneer.get_versions()["version"]
         major_version = re.findall(MAJOR_VER_REGEX, version)[0]
         minor_version = re.findall(MINOR_VER_REGEX, version)[0]
         patch_version = re.findall(PATCH_VER_REGEX, version)[0]
         short_version = major_version + "." + minor_version + "." + patch_version
-        
+
         version_dict = {}
         odin_data_dict = {}
-        
+
         odin_data_dict["full"] = version
         odin_data_dict["major"] = major_version
         odin_data_dict["minor"] = minor_version
         odin_data_dict["patch"] = patch_version
         odin_data_dict["short"] = short_version
-        
+
         version_dict["odin-data"] = odin_data_dict
         version_dict["writer"] = self.get_writer_version()
-        
+
         reply.set_param('version', version_dict)
         return reply
 
@@ -340,7 +341,7 @@ class MetaListener:
             for key, value in self._writers.items():
                 if value.finished:
                     del self._writers[key]
-                    
+
     def stop_all_writers(self):
         """Force stop all writers."""
         for key in self._writers:
@@ -353,12 +354,12 @@ class MetaListener:
 
         :param: directory: Directory to create the meta file in
         :param: acquisition_id: Acquisition ID of the new acquisition
-        """        
+        """
         if self._writer_module is None:
             raise Exception('No writer class configured')
-        
+
         module_name = self._writer_module[:self._writer_module.rfind('.')]
-        class_name = self._writer_module[self._writer_module.rfind('.') + 1:]        
+        class_name = self._writer_module[self._writer_module.rfind('.') + 1:]
         module = importlib.import_module(module_name, package=None)
         writer_class = getattr(module, class_name)
         writer_instance = writer_class(self.logger, directory, acquisition_id)
@@ -369,7 +370,7 @@ class MetaListener:
         """Get the version from the writer object."""
         if self._writer_module is None:
             raise Exception('No writer class configured')
-          
+
         module_name = self._writer_module[:self._writer_module.rfind('.')]
         class_name = self._writer_module[self._writer_module.rfind('.') + 1:]
         module = importlib.import_module(module_name, package=None)
