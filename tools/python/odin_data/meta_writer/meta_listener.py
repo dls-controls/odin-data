@@ -7,6 +7,7 @@ Matt Taylor, Diamond Light Source
 """
 import logging
 import re
+import struct
 from json import loads
 import importlib
 
@@ -163,6 +164,10 @@ class MetaListener(object):
         if header["type"] == "raw":
             data = socket.recv()
             self._logger.debug("Data message part is a data blob")
+        elif header["type"] == "integer":
+            raw_data = socket.recv()
+            data = struct.unpack('i', raw_data)
+            self._logger.debug("Data message part is an integer: {}".format(data))
         else:
             data = socket.recv()
             if data:

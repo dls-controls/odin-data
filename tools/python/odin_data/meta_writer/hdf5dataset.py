@@ -42,6 +42,10 @@ class HDF5Dataset(object):
         """
         self._h5py_dataset = dataset_handle
 
+        # Turn off the cache if the dataset_size is set to 0 (unlimited)
+        if dataset_size == 0:
+            self._cache = None
+
         if self._cache is not None and dataset_size is not None:
             self._cache = np.full(dataset_size, self.fillvalue, dtype=self.dtype)
             self._h5py_dataset.resize(dataset_size, axis=0)
@@ -83,6 +87,15 @@ class HDF5Dataset(object):
             self._h5py_dataset[...] = self._cache
 
         self._h5py_dataset.flush()
+
+
+class Int32HDF5Dataset(HDF5Dataset):
+    """Int32 HDF5Dataset"""
+
+    def __init__(self, name, shape=None, cache=True):
+        super(Int32HDF5Dataset, self).__init__(
+            name, dtype="int32", fillvalue=-1, shape=shape, cache=cache
+        )
 
 
 class Int64HDF5Dataset(HDF5Dataset):

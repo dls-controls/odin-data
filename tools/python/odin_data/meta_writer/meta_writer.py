@@ -202,7 +202,7 @@ class MetaWriter(object):
             return
 
         if dataset_name not in self._datasets:
-            self._logger.error("%s | No such dataset %s")
+            self._logger.error("%s | No such dataset %s", self._name, dataset_name)
             return
 
         self._datasets[dataset_name].add_value(value, offset)
