@@ -115,25 +115,6 @@ class MetaWriter(object):
         self._writers_finished = False
         self._detector_finished = True  # See stop_when_detector_finished
 
-    @staticmethod
-    def _define_datasets():
-        return [
-            Int64HDF5Dataset(FRAME),
-            Int64HDF5Dataset(OFFSET),
-            Int64HDF5Dataset(CREATE_DURATION, cache=False),
-            Int64HDF5Dataset(WRITE_DURATION),
-            Int64HDF5Dataset(FLUSH_DURATION),
-            Int64HDF5Dataset(CLOSE_DURATION, cache=False),
-        ]
-
-    @staticmethod
-    def _define_detector_datasets():
-        return []
-
-    @property
-    def file_open(self):
-        return self._hdf5_file is not None
-
     @property
     def active_process_count(self):
         return self._processes_running.count(True)
@@ -316,8 +297,8 @@ class MetaWriter(object):
         """Register that it is OK to stop when all detector-specific logic is complete
 
         By default_detector_finished is set to True initially so that this check always
-        passes. Child classes that need to do their own checks can set this to False in
-        __ init__ and call stop_when_writers_finished when ready to stop.
+        passes. Base classes should set _detector_finished to False in __init__ and call
+        stop_when_writers_finished when ready to stop.
 
         """
         self._writers_finished = True
@@ -330,7 +311,7 @@ class MetaWriter(object):
     def stop_when_writers_finished(self):
         """Register that it is OK to stop when all monitored writers have finished
 
-        Child classes can call this when all detector specific logic is complete.
+        Base classes can call this when all detector specific logic is complete.
 
         """
         self._detector_finished = True
