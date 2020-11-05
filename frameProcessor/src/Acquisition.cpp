@@ -165,10 +165,10 @@ ProcessFrameStatus Acquisition::process_frame(boost::shared_ptr<Frame> frame, HD
       // or if no master frame has been defined. If either of these conditions
       // are true then increment the number of frames written.
       if (master_frame_.empty() || master_frame_ == frame_dataset_name) {
-        size_t dataset_frames = current_file->get_dataset_frames(frame_dataset_name);
+        size_t dataset_frames = current_file_->get_dataset_frames(frame_dataset_name);
         frames_processed_++;
         LOG4CXX_TRACE(logger_, "Master frame processed");
-        size_t current_file_index = current_file->get_file_index() / concurrent_processes_;
+        size_t current_file_index = current_file_->get_file_index() / concurrent_processes_;
         size_t frames_written_to_previous_files = current_file_index * frames_per_block_ * blocks_per_file_;
         size_t total_frames_written = frames_written_to_previous_files + dataset_frames;
         if (total_frames_written == frames_written_) {
@@ -228,14 +228,14 @@ ProcessFrameStatus Acquisition::process_frame(boost::shared_ptr<Frame> frame, HD
  */
 void Acquisition::create_file(size_t file_number, HDF5CallDurations_t& call_durations) {
   // Set previous file to current file, closing off the file for the previous file first
-  close_file(previous_file, call_durations);
-  previous_file = current_file;
+  close_file(previous_file_, call_durations);
+  previous_file_ = current_file_;
 
-  current_file = boost::shared_ptr<HDF5File>(new HDF5File(hdf5_error_definition_));
+  current_file_ = boost::shared_ptr<HDF5File>(new HDF5File(hdf5_error_definition_));
 
   // Create the file
   boost::filesystem::path full_path = boost::filesystem::path(file_path_) / boost::filesystem::path(filename_);
-  size_t duration = current_file->create_file(
+  size_t duration = current_file_->create_file(
     full_path.string(), file_number, use_earliest_hdf5_, alignment_threshold_, alignment_value_
   );
   call_durations.create.update(duration);
@@ -246,7 +246,7 @@ void Acquisition::create_file(size_t file_number, HDF5CallDurations_t& call_dura
   if (total_frames_ == 0) {
     // Running in continuous mode, so we could receive any number of frames
     // Make the HDF5 datasets unlimited
-    current_file->set_unlimited();
+    current_file_->set_unlimited();
   }
 
   // Create the datasets from the definitions
@@ -285,10 +285,10 @@ void Acquisition::create_file(size_t file_number, HDF5CallDurations_t& call_dura
       dset_def.num_frames = frames_to_write_;
     }
     validate_dataset_definition(dset_def);
-    current_file->create_dataset(dset_def, low_index, high_index);
+    current_file_->create_dataset(dset_def, low_index, high_index);
   }
 
-  current_file->start_swmr();
+  current_file_->start_swmr();
 }
 
 /**
@@ -398,8 +398,8 @@ bool Acquisition::start_acquisition(
  * Stops this acquisition, closing off any open files
  */
 void Acquisition::stop_acquisition(HDF5CallDurations_t& call_durations) {
-  close_file(previous_file, call_durations);
-  close_file(current_file, call_durations);
+  close_file(previous_file_, call_durations);
+  close_file(current_file_, call_durations);
   publish_meta(META_NAME, META_STOP_ITEM, "", get_meta_header());
 }
 
@@ -414,67 +414,81 @@ bool Acquisition::check_frame_valid(boost::shared_ptr<Frame> frame)
 {
   bool invalid = false;
   const FrameMetaData frame_meta_data = frame->get_meta_data();
-  DatasetDefinition dataset = dataset_defs_.at(frame_meta_data.get_dataset_name());
-
-  // Check if frame compression is set to unknown and raise an error.
-  // Otherwise verify the compression is consistent with the dataset definition.
-  CompressionType frame_compression_type = frame_meta_data.get_compression_type();
-  if (frame_compression_type == unknown_compression) {
+  DatasetDefinition dataset;
+  try
+  {
+    dataset = dataset_defs_.at(frame_meta_data.get_dataset_name());
+  }
+  catch (const std::out_of_range& e) {
     std::stringstream ss;
-    ss << "Invalid frame: Frame has unknown compression for dataset " << dataset.name;
-    last_error_ = ss.str();
-    LOG4CXX_ERROR(logger_, last_error_);
-    invalid = true;
-  } else if (frame_compression_type != dataset.compression) {
-    std::stringstream ss;
-    ss << "Invalid frame: Frame has compression " << frame_compression_type <<
-          ", expected " << dataset.compression <<
-          " for dataset " << dataset.name <<
-          " (0: Unknown, 1: None, 2: LZ4, 3: BSLZ4, 4: Blosc)";
+    ss << "Frame destined for [" << frame_meta_data.get_dataset_name()
+    << "] but dataset has not been defined in the HDF plugin";
     last_error_ = ss.str();
     LOG4CXX_ERROR(logger_, last_error_);
     invalid = true;
   }
 
-  // Check if frame data type is set to unknown and raise an error.
-  // Otherwise verify the data type is consistent with the dataset definition.
-  DataType frame_data_type = frame_meta_data.get_data_type();
-  if (frame_data_type == raw_unknown) {
-    std::stringstream ss;
-    ss << "Invalid frame: Frame has unknown data type for dataset " << dataset.name;
-    last_error_ = ss.str();
-    LOG4CXX_ERROR(logger_, last_error_);
-    invalid = true;
-  } else if (frame_data_type != dataset.data_type) {
-    std::stringstream ss;
-    ss << "Invalid frame: Frame has data type " << frame_data_type <<
-       ", expected " << dataset.data_type <<
-       " for dataset " << dataset.name <<
-       " (0: UNKNOWN, 1: UINT8, 2: UINT16, 3: UINT32, 4: UINT64, 5: FLOAT)";
-    last_error_ = ss.str();
-    LOG4CXX_ERROR(logger_, last_error_);
-    invalid = true;
-  }
-  dimensions_t frame_dimensions = frame_meta_data.get_dimensions();
-  if (frame_dimensions != dataset.frame_dimensions) {
-    if (frame_dimensions.size() >= 2 && dataset.frame_dimensions.size() >= 2) {
+  if (!invalid){
+    // Check if frame compression is set to unknown and raise an error.
+    // Otherwise verify the compression is consistent with the dataset definition.
+    CompressionType frame_compression_type = frame_meta_data.get_compression_type();
+    if (frame_compression_type == unknown_compression) {
       std::stringstream ss;
-      ss << "Invalid frame: Frame has dimensions [" << frame_dimensions[0] << ", " << frame_dimensions[1] <<
-         "], expected [" << dataset.frame_dimensions[0] << ", " << dataset.frame_dimensions[1] <<
-         "] for dataset " << dataset.name;
+      ss << "Invalid frame: Frame has unknown compression for dataset " << dataset.name;
       last_error_ = ss.str();
       LOG4CXX_ERROR(logger_, last_error_);
-    } else if (frame_dimensions.size() >= 1 && dataset.frame_dimensions.size() >= 1) {
+      invalid = true;
+    } else if (frame_compression_type != dataset.compression) {
       std::stringstream ss;
-      ss << "Invalid frame: Frame has dimensions [" << frame_dimensions[0]  <<
-         "], expected [" << dataset.frame_dimensions[0] << "] for dataset " << dataset.name;
+      ss << "Invalid frame: Frame has compression " << frame_compression_type <<
+            ", expected " << dataset.compression <<
+            " for dataset " << dataset.name <<
+            " (0: Unknown, 1: None, 2: LZ4, 3: BSLZ4, 4: Blosc)";
       last_error_ = ss.str();
       LOG4CXX_ERROR(logger_, last_error_);
-    } else {
-      last_error_ = "Invalid frame: Frame dimensions do not match";
-      LOG4CXX_ERROR(logger_, last_error_);
+      invalid = true;
     }
-    invalid = true;
+
+    // Check if frame data type is set to unknown and raise an error.
+    // Otherwise verify the data type is consistent with the dataset definition.
+    DataType frame_data_type = frame_meta_data.get_data_type();
+    if (frame_data_type == raw_unknown) {
+      std::stringstream ss;
+      ss << "Invalid frame: Frame has unknown data type for dataset " << dataset.name;
+      last_error_ = ss.str();
+      LOG4CXX_ERROR(logger_, last_error_);
+      invalid = true;
+    } else if (frame_data_type != dataset.data_type) {
+      std::stringstream ss;
+      ss << "Invalid frame: Frame has data type " << frame_data_type <<
+        ", expected " << dataset.data_type <<
+        " for dataset " << dataset.name <<
+        " (0: UNKNOWN, 1: UINT8, 2: UINT16, 3: UINT32, 4: UINT64, 5: FLOAT)";
+      last_error_ = ss.str();
+      LOG4CXX_ERROR(logger_, last_error_);
+      invalid = true;
+    }
+    dimensions_t frame_dimensions = frame_meta_data.get_dimensions();
+    if (frame_dimensions != dataset.frame_dimensions) {
+      if (frame_dimensions.size() >= 2 && dataset.frame_dimensions.size() >= 2) {
+        std::stringstream ss;
+        ss << "Invalid frame: Frame has dimensions [" << frame_dimensions[0] << ", " << frame_dimensions[1] <<
+          "], expected [" << dataset.frame_dimensions[0] << ", " << dataset.frame_dimensions[1] <<
+          "] for dataset " << dataset.name;
+        last_error_ = ss.str();
+        LOG4CXX_ERROR(logger_, last_error_);
+      } else if (frame_dimensions.size() >= 1 && dataset.frame_dimensions.size() >= 1) {
+        std::stringstream ss;
+        ss << "Invalid frame: Frame has dimensions [" << frame_dimensions[0]  <<
+          "], expected [" << dataset.frame_dimensions[0] << "] for dataset " << dataset.name;
+        last_error_ = ss.str();
+        LOG4CXX_ERROR(logger_, last_error_);
+      } else {
+        last_error_ = "Invalid frame: Frame dimensions do not match";
+        LOG4CXX_ERROR(logger_, last_error_);
+      }
+      invalid = true;
+    }
   }
   return !invalid;
 }
@@ -530,35 +544,35 @@ size_t Acquisition::get_file_index(size_t frame_offset) const {
  */
 boost::shared_ptr<HDF5File> Acquisition::get_file(size_t frame_offset, HDF5CallDurations_t& call_durations) {
   if (blocks_per_file_ == 0) {
-    return this->current_file;
+    return this->current_file_;
   }
 
   // Get the file index this frame should go into
   size_t file_index = get_file_index(frame_offset);
 
   // Get the file for this frame index
-  if (file_index == current_file->get_file_index()) {
-    return this->current_file;
-  } else if (previous_file != 0 && file_index == previous_file->get_file_index()) {
-    return this->previous_file;
-  } else if (file_index > current_file->get_file_index()) {
+  if (file_index == current_file_->get_file_index()) {
+    return this->current_file_;
+  } else if (previous_file_ != 0 && file_index == previous_file_->get_file_index()) {
+    return this->previous_file_;
+  } else if (file_index > current_file_->get_file_index()) {
     LOG4CXX_TRACE(logger_,"Creating new file as frame " << frame_offset <<
-        " won't go into file index " << current_file->get_file_index() << " as it requires " << file_index);
+        " won't go into file index " << current_file_->get_file_index() << " as it requires " << file_index);
 
     // Check for missing files and create them if they have been missed
-    size_t next_expected_file_index = current_file->get_file_index() + concurrent_processes_;
+    size_t next_expected_file_index = current_file_->get_file_index() + concurrent_processes_;
     while (next_expected_file_index < file_index) {
       LOG4CXX_DEBUG_LEVEL(1, logger_,"Creating missing file " << next_expected_file_index);
       filename_ = generate_filename(next_expected_file_index);
       create_file(next_expected_file_index, call_durations);
-      next_expected_file_index = current_file->get_file_index() + concurrent_processes_;
+      next_expected_file_index = current_file_->get_file_index() + concurrent_processes_;
     }
 
     filename_ = generate_filename(file_index);
 
     create_file(file_index, call_durations);
 
-    return this->current_file;
+    return this->current_file_;
   } else {
     LOG4CXX_WARN(logger_,"Unable to write frame offset " << frame_offset << " as no suitable file found");
     return boost::shared_ptr<HDF5File>();

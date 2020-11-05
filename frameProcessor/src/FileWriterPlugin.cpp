@@ -129,8 +129,8 @@ void FileWriterPlugin::process_frame(boost::shared_ptr<Frame> frame)
   boost::mutex::scoped_lock cflock(close_file_mutex_);
   boost::lock_guard<boost::recursive_mutex> lock(mutex_);
 
-  // Check the frame against the current acquisition and start a new one if
-  // the frame object contains a different acquisition ID from the current one
+  // check it matches the current (or next) acquisition.
+  // frames that don't match are dropped / ignored.
   if (frame_in_acquisition(frame)) {
 
     if (writing_) {
@@ -521,8 +521,37 @@ void FileWriterPlugin::configure_file(OdinData::IpcMessage& config, OdinData::Ip
   LOG4CXX_DEBUG_LEVEL(1, logger_, "Configure file name and path");
   // Check for file path and file name
   if (config.has_param(FileWriterPlugin::CONFIG_FILE_PATH)) {
-    this->next_acquisition_->file_path_ = config.get_param<std::string>(FileWriterPlugin::CONFIG_FILE_PATH);
-    LOG4CXX_DEBUG_LEVEL(1, logger_, "Next file path changed to " << this->next_acquisition_->file_path_);
+    std::string file_path = config.get_param<std::string>(FileWriterPlugin::CONFIG_FILE_PATH);
+    boost::filesystem::path p(file_path);
+    // Check path exists
+    boost::system::error_code ec;
+    if (boost::filesystem::exists(p, ec)){
+      // Check path is a directory
+      if (boost::filesystem::is_directory(p, ec)){
+        // Check directory has write permission
+        if (eaccess(file_path.c_str(), W_OK)){
+          // Return code other then zero is a failure
+          std::stringstream ss;
+          ss << "User does not have write permissions for directory: " << file_path;
+          LOG4CXX_ERROR(logger_, ss.str());
+          reply.set_nack(ss.str());
+        } else {
+          // All checks passed, we can write to this location
+          this->next_acquisition_->file_path_ = config.get_param<std::string>(FileWriterPlugin::CONFIG_FILE_PATH);
+          LOG4CXX_DEBUG_LEVEL(1, logger_, "Next file path changed to " << this->next_acquisition_->file_path_);
+        }
+      } else {
+        std::stringstream ss;
+        ss << "Path is not a directory: " << file_path;
+        LOG4CXX_ERROR(logger_, ss.str());
+        reply.set_nack(ss.str());
+      }
+    } else {
+      std::stringstream ss;
+      ss << "Invalid path requested: " << file_path;
+      LOG4CXX_ERROR(logger_, ss.str());
+      reply.set_nack(ss.str());
+    }
   }
   if (config.has_param(FileWriterPlugin::CONFIG_FILE_NAME)) {
     this->next_acquisition_->configured_filename_ = config.get_param<std::string>(FileWriterPlugin::CONFIG_FILE_NAME);
@@ -733,12 +762,13 @@ bool FileWriterPlugin::reset_statistics()
   return true;
 }
 
-/** Check if the frame contains an acquisition ID and start a new file if it does and it's different from the current one
+/** This function checks the acquisition id of the frame matches that of the current acquisition,
+ * subject to two caveats:
+ *  i) if the frame-aid is "", it matches anything
+ *  ii) this function has the side-effect of moving from the current-acq to
+ *        the next-acq if that helps us match the frame.
  *
- * If the frame object contains an acquisition ID, then we need to check if the current acquisition we are writing has
- * the same ID. If it is different, then we close the current file and create a new one and start writing.
- * If we are not currently writing then we just create a new file and start writing.
- *
+ *  The function will set an error if the frame does not match a writing acquisition. 
  * \param[in] frame - Pointer to the Frame object.
  */
 bool FileWriterPlugin::frame_in_acquisition(boost::shared_ptr<Frame> frame) {
